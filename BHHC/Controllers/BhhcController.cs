@@ -1,39 +1,53 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
+﻿using BHHC.Models;
+using System;
+using System.Web;
 using System.Web.Http;
 
 namespace BHHC.Controllers
 {
     public class BhhcController : ApiController
     {
+        private string authToken = "683202f0-d438-4b47-a426-813eb94f9d14";
         // GET api/<controller>
-        public IEnumerable<string> Get()
+        public IHttpActionResult Get()
         {
-            return new string[] { "value1", "value2", "value3"};
+            HttpContext httpContext = HttpContext.Current;
+            if(Request.Headers == null ||
+                Request.Headers.Authorization == null ||
+               string.IsNullOrEmpty(Request.Headers.Authorization.Parameter))
+            {
+                return Unauthorized();
+            }
+
+            //is this an authorized request
+            string authToken = Request.Headers.Authorization.Parameter;
+            int index = authToken.IndexOf("Basic ");
+            authToken = authToken.Substring("basic ".Length + 1, authToken.Length - index);
+            if(!IsAuthorized(authToken))
+            {
+                return Unauthorized();
+            }
+
+            using (BhhcDBContext db = new BhhcDBContext())
+            {
+                return Ok(db.Reasons);
+            }
         }
 
-        // GET api/<controller>/5
-        public string Get(int id)
+        /// <summary>
+        /// Returns true if the decoded token matches the value of authToken
+        /// otherwise returns false
+        /// </summary>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        private bool IsAuthorized(string token)
         {
-            return "value";
-        }
-
-        // POST api/<controller>
-        public void Post([FromBody]string value)
-        {
-        }
-
-        // PUT api/<controller>/5
-        public void Put(int id, [FromBody]string value)
-        {
-        }
-
-        // DELETE api/<controller>/5
-        public void Delete(int id)
-        {
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new ArgumentNullException("token");
+            }
+            string decodedToken = Utilities.Authentication.DecodeToken(token);
+            return (authToken.Equals(decodedToken) ? true : false);
         }
     }
 }
